@@ -69,6 +69,7 @@
   let calendar;
   async function loadCalendar() {
     const leaves = await api('/api/leaves');
+    renderUpcoming(leaves);
     const events = leaves
       .filter((l) => l.status !== 'rejected')
       .map((l) => {
@@ -102,6 +103,32 @@
       calendar.removeAllEvents();
       calendar.addEventSource(events);
     }
+  }
+
+  function renderUpcoming(leaves) {
+    const box = document.getElementById('upcomingList');
+    if (!box) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const upcoming = leaves
+      .filter((l) => l.status !== 'rejected' && l.endDate >= todayStr)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .slice(0, 10);
+    if (!upcoming.length) {
+      box.innerHTML = '<div class="empty">ไม่มีวันลาที่กำลังจะถึง</div>';
+      return;
+    }
+    box.innerHTML = upcoming
+      .map((l) => {
+        const t = typeMap[l.type] || { color: '#6b7280', label: l.type };
+        return `
+      <div class="list-item upcoming-item">
+        <div class="meta">
+          <span class="name"><i class="dot" style="background:${t.color}"></i>${escapeHtml(l.userName)}</span>
+          <span class="sub">${t.label} · ${l.startDate} → ${l.endDate}${l.status === 'pending' ? ' (รออนุมัติ)' : ''}</span>
+        </div>
+      </div>`;
+      })
+      .join('');
   }
 
   // ---------- request form ----------

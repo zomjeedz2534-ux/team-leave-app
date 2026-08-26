@@ -240,6 +240,12 @@ tr:last-child td { border-bottom: none; }
 
 #calendar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
 
+.calendar-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+.upcoming-card h3 { margin: 0 0 12px; font-size: 15px; }
+.upcoming-card .list { max-height: 560px; }
+.upcoming-item .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+@media (max-width: 900px) { .calendar-layout { grid-template-columns: 1fr; } }
+
 .table-scroll { overflow-x: auto; }
 .table-scroll table input[type="number"] { padding: 6px 8px; }
 .table-scroll table select { padding: 6px 8px; }
