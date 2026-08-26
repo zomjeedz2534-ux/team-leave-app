@@ -42,6 +42,59 @@
     return `<span class="sub"><a href="/api/leaves/${l.id}/attachment" target="_blank" rel="noopener">📎 ดูไฟล์แนบ</a></span>`;
   }
 
+  // ---------- notifications: someone deleted their own already-approved leave ----------
+  const NOTIF_SEEN_KEY = 'teamLeaveApp_historyLastSeenAt';
+  const toastedHistoryIds = new Set();
+
+  function getHistoryLastSeenAt() {
+    let v = localStorage.getItem(NOTIF_SEEN_KEY);
+    if (!v) {
+      v = new Date().toISOString();
+      try { localStorage.setItem(NOTIF_SEEN_KEY, v); } catch (e) {}
+    }
+    return new Date(v);
+  }
+
+  function markHistorySeen() {
+    try { localStorage.setItem(NOTIF_SEEN_KEY, new Date().toISOString()); } catch (e) {}
+    updateHistoryBadge(0);
+  }
+
+  function updateHistoryBadge(n) {
+    const badge = document.getElementById('historyBadge');
+    if (!badge) return;
+    badge.textContent = n;
+    badge.style.display = n > 0 ? 'inline-block' : 'none';
+  }
+
+  async function checkDeletionNotifications() {
+    if (!IS_ELEVATED) return;
+    try {
+      const history = await api('/api/leaves/history');
+      const lastSeen = getHistoryLastSeenAt();
+      const notifs = history.filter(
+        (h) =>
+          h.action === 'deleted' &&
+          h.detail &&
+          h.detail.previousStatus === 'approved' &&
+          h.actorId === h.targetUserId &&
+          new Date(h.createdAt) > lastSeen
+      );
+      notifs.forEach((h) => {
+        if (toastedHistoryIds.has(h.id)) return;
+        toastedHistoryIds.add(h.id);
+        const d = h.detail;
+        toast(
+          `⚠️ ${h.actorName} ลบคำขอลาที่อนุมัติแล้วของตัวเอง (${h.typeLabel || ''} ${d.startDate} → ${d.endDate})`,
+          'error'
+        );
+      });
+      updateHistoryBadge(notifs.length);
+    } catch (e) {
+      // เงียบไว้ ไม่รบกวนผู้ใช้
+    }
+  }
+
   // ---------- tabs ----------
   const tabBtns = document.querySelectorAll('.tab-btn');
   tabBtns.forEach((btn) => {
@@ -56,7 +109,7 @@
     if (tab === 'pending') loadPending();
     if (tab === 'balance') loadBalance();
     if (tab === 'team') { loadGoogleStatus(); loadTeamQuotas(); }
-    if (tab === 'history') { loadAllLeaves(); if (IS_ELEVATED) loadHistoryLog(); }
+    if (tab === 'history') { loadAllLeaves(); if (IS_ELEVATED) { loadHistoryLog(); markHistorySeen(); } }
   }
 
   // ---------- legend ----------
@@ -592,6 +645,7 @@
   }
 
   setInterval(refreshCurrentTab, 20000);
+  setInterval(checkDeletionNotifications, 20000);
 
   // ---------- init ----------
   const params = new URLSearchParams(location.search);
@@ -601,4 +655,5 @@
 
   loadCalendar();
   if (document.getElementById('pendingList')) loadPending();
+  checkDeletionNotifications();
 })();
