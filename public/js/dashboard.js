@@ -472,6 +472,7 @@
           if (r.googleError) toast('บันทึกแล้ว แต่อัปเดต Google Calendar ไม่สำเร็จ: ' + r.googleError, 'error');
           else toast('บันทึกการแก้ไขแล้ว', 'success');
           loadAllLeaves();
+          if (IS_ELEVATED) loadHistoryLog();
         } catch (e) {
           toast(e.message, 'error');
         }
@@ -484,6 +485,7 @@
           await api('/api/leaves/' + btn.dataset.deleteLeave, { method: 'DELETE' });
           toast('ลบคำขอลาแล้ว', 'success');
           loadAllLeaves();
+          if (IS_ELEVATED) loadHistoryLog();
         } catch (e) {
           toast(e.message, 'error');
         }
@@ -555,6 +557,41 @@
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
+
+  // ---------- auto-refresh (so changes from others show up without pressing F5) ----------
+  function currentTab() {
+    const active = document.querySelector('.tab-btn.active');
+    return active ? active.dataset.tab : null;
+  }
+
+  function hasOpenEdit(box) {
+    if (!box) return false;
+    return Array.from(box.querySelectorAll('.edit-mode')).some((el) => el.style.display !== 'none');
+  }
+
+  async function refreshCurrentTab() {
+    const tab = currentTab();
+    if (document.hidden || !tab) return;
+    try {
+      if (tab === 'calendar') await loadCalendar();
+      if (tab === 'request') await loadMyLeaves();
+      if (tab === 'pending') await loadPending();
+      if (tab === 'balance') await loadBalance();
+      if (tab === 'history') {
+        if (!hasOpenEdit(document.getElementById('allLeaveList'))) await loadAllLeaves();
+        if (IS_ELEVATED) await loadHistoryLog();
+      }
+      // เก็บ badge คำขอรออนุมัติให้ทันสมัยแม้ไม่ได้อยู่แท็บนั้น
+      if (IS_ELEVATED && tab !== 'pending') {
+        const pending = await api('/api/leaves?status=pending');
+        updatePendingBadge(pending.length);
+      }
+    } catch (e) {
+      // เงียบไว้ ไม่รบกวนผู้ใช้ด้วย error ของการ refresh พื้นหลัง
+    }
+  }
+
+  setInterval(refreshCurrentTab, 20000);
 
   // ---------- init ----------
   const params = new URLSearchParams(location.search);
