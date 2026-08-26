@@ -39,9 +39,10 @@ async function getLeaveById(id) {
   return mapLeave(rows[0]);
 }
 
+// นับ pending_deletion รวมกับ approved ด้วย เพราะยังไม่ถูกอนุมัติให้ลบจริง วันลาจึงยังต้องถูกหักอยู่
 async function getApprovedLeavesForUser(userId) {
   const { rows } = await pool.query(
-    `SELECT ${SELECT_COLUMNS} FROM leaves WHERE user_id = $1 AND status = 'approved'`,
+    `SELECT ${SELECT_COLUMNS} FROM leaves WHERE user_id = $1 AND status IN ('approved', 'pending_deletion')`,
     [userId]
   );
   return rows.map(mapLeave);
