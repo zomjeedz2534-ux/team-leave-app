@@ -62,7 +62,11 @@
             <label>เหตุผล</label>
             <textarea name="reason" rows="3" placeholder="ระบุเหตุผลการลา (ไม่บังคับ)"></textarea>
             <label>อีเมลที่ต้องการ tag เพิ่มเติมใน Google Calendar</label>
-            <textarea name="extraEmails" rows="2" placeholder="คั่นด้วยจุลภาคหรือขึ้นบรรทัดใหม่ เช่น manager@company.com, hr@company.com (ไม่บังคับ)"></textarea>
+            <div class="checkbox-list" id="extraEmailsList">
+              <% teamEmailOptions.forEach(email => { %>
+                <label class="checkbox-item"><input type="checkbox" value="<%= email %>" /><span><%= email %></span></label>
+              <% }) %>
+            </div>
             <label id="attachmentLabel">แนบไฟล์ใบรับรองแพทย์ / รูปภาพประกอบ (ถ้ามี)</label>
             <input type="file" id="attachmentInput" accept="image/jpeg,image/png,image/webp,image/heic,application/pdf" />
             <p class="hint" style="margin-top:4px">รองรับ JPG, PNG, WEBP, HEIC, PDF ขนาดไม่เกิน 4MB</p>

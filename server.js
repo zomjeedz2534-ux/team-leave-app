@@ -10,7 +10,7 @@ const authRoutes = require('./routes/auth');
 const leaveRoutes = require('./routes/leaves');
 const userRoutes = require('./routes/users');
 const googleRoutes = require('./routes/google');
-const { LEAVE_TYPES, ROLES, ELEVATED_ROLES } = require('./constants');
+const { LEAVE_TYPES, ROLES, ELEVATED_ROLES, TEAM_EMAIL_OPTIONS } = require('./constants');
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -46,6 +46,7 @@ app.get('/', requireLogin, (req, res) => {
     user: req.session.user,
     leaveTypes: LEAVE_TYPES,
     roles: ROLES,
+    teamEmailOptions: TEAM_EMAIL_OPTIONS,
     isElevated: ELEVATED_ROLES.includes(req.session.user.role),
     roleLabel: (ROLES.find((r) => r.key === req.session.user.role) || {}).label || req.session.user.role,
   });

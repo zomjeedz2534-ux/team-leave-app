@@ -110,6 +110,12 @@
     e.preventDefault();
     const fd = new FormData(leaveForm);
     const payload = Object.fromEntries(fd.entries());
+    const extraEmailsList = document.getElementById('extraEmailsList');
+    if (extraEmailsList) {
+      payload.extraEmails = Array.from(extraEmailsList.querySelectorAll('input:checked'))
+        .map((cb) => cb.value)
+        .join(',');
+    }
     const file = attachmentInput && attachmentInput.files[0];
     if (file) {
       if (file.size > 4 * 1024 * 1024) {

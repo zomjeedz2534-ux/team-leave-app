@@ -34,6 +34,20 @@ function canApprove(approverRole, requesterRole) {
 const ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024; // 4MB
 const ATTACHMENT_ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 
+// รายชื่ออีเมลให้เลือก tag เพิ่มเติมใน Google Calendar ตอนขอลา (แก้ไขรายชื่อได้ตรงนี้)
+const TEAM_EMAIL_OPTIONS = [
+  'tanakorn.natz@gmail.com',
+  'redchanya@gmail.com',
+  'nontiya.cha@gmail.com',
+  'pepoginaja@gmail.com',
+  'gypevalyn.xoxo@gmail.com',
+  'natapon.rati@gmail.com',
+  'fildering@gmail.com',
+  'sarita0128.p@gmail.com',
+  'skzii.pp@gmail.com',
+  'kate8chinnawat@gmail.com',
+];
+
 module.exports = {
   LEAVE_TYPES,
   DEFAULT_QUOTAS,
@@ -43,4 +57,5 @@ module.exports = {
   canApprove,
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_ALLOWED_MIME,
+  TEAM_EMAIL_OPTIONS,
 };
