@@ -94,6 +94,7 @@
         height: 'auto',
         headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
         locale: 'th',
+        titleFormat: { year: 'numeric', month: 'long', calendar: 'gregory' },
         events,
       });
       calendar.render();
