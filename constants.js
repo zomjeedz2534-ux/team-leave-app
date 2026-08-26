@@ -2,7 +2,6 @@ const LEAVE_TYPES = [
   { key: 'vacation', label: 'ลาพักร้อน', color: '#2563eb', hasQuota: true },
   { key: 'sick', label: 'ลาป่วย', color: '#dc2626', hasQuota: true },
   { key: 'personal', label: 'ลากิจ', color: '#d97706', hasQuota: true },
-  { key: 'other', label: 'อื่นๆ', color: '#6b7280', hasQuota: false },
 ];
 
 const DEFAULT_QUOTAS = { vacation: 10, sick: 30, personal: 3 };
