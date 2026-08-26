@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>เข้าสู่ระบบ - ระบบลาพักร้อนของทีม</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>🌴 ระบบลาของทีม</h1>
+    <p class="subtitle">เข้าสู่ระบบเพื่อขอลา ดูปฏิทิน หรืออนุมัติคำขอ</p>
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/login">
+      <label>อีเมล</label>
+      <input type="email" name="email" required autofocus placeholder="you@company.com" />
+      <label>รหัสผ่าน</label>
+      <input type="password" name="password" required placeholder="••••••••" />
+      <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
+    </form>
+    <p class="hint">ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบเพื่อสร้างบัญชีให้คุณ</p>
+  </div>
+</body>
+</html>
