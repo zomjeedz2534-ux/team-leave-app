@@ -21,8 +21,8 @@
       <button class="tab-btn" data-tab="balance">วันลาคงเหลือ</button>
       <% if (isElevated) { %>
       <button class="tab-btn" data-tab="team">จัดการทีม</button>
-      <button class="tab-btn" data-tab="history">ประวัติ</button>
       <% } %>
+      <button class="tab-btn" data-tab="history">ประวัติ</button>
       <button class="tab-btn" data-tab="account">บัญชีของฉัน</button>
     </nav>
     <div class="userbox">
@@ -127,20 +127,28 @@
         <div id="teamQuotaTable" class="table-scroll"></div>
       </div>
     </section>
+    <% } %>
 
     <!-- ประวัติ -->
     <section class="panel" id="panel-history">
       <div class="card" style="margin-bottom:20px">
         <h2>คำขอลาทั้งหมด</h2>
-        <p class="hint" style="margin-top:0">แก้ไขหรือลบคำขอลาของใครก็ได้ (ไม่ว่าจะสถานะไหน) — ถ้าคำขอนั้น sync ขึ้น Google Calendar แล้ว ระบบจะอัปเดต/ลบ event ให้อัตโนมัติด้วย</p>
+        <p class="hint" style="margin-top:0">
+          <% if (isElevated) { %>
+            แก้ไขหรือลบคำขอลาของใครก็ได้ (ไม่ว่าจะสถานะไหน) — ถ้าคำขอนั้น sync ขึ้น Google Calendar แล้ว ระบบจะอัปเดต/ลบ event ให้อัตโนมัติด้วย
+          <% } else { %>
+            ลบคำขอลาของตัวเองได้ (ไม่ว่าจะสถานะไหน) — ถ้าคำขอนั้น sync ขึ้น Google Calendar แล้ว ระบบจะลบ event ให้อัตโนมัติด้วย
+          <% } %>
+        </p>
         <div id="allLeaveList" class="list"></div>
       </div>
+      <% if (isElevated) { %>
       <div class="card">
         <h2>ประวัติการดำเนินการ</h2>
         <div id="historyLog" class="list"></div>
       </div>
+      <% } %>
     </section>
-    <% } %>
 
     <!-- บัญชีของฉัน -->
     <section class="panel" id="panel-account">

@@ -56,7 +56,7 @@
     if (tab === 'pending') loadPending();
     if (tab === 'balance') loadBalance();
     if (tab === 'team') { loadGoogleStatus(); loadTeamQuotas(); }
-    if (tab === 'history') { loadAllLeaves(); loadHistoryLog(); }
+    if (tab === 'history') { loadAllLeaves(); if (IS_ELEVATED) loadHistoryLog(); }
   }
 
   // ---------- legend ----------
@@ -370,13 +370,13 @@
     });
   }
 
-  // ---------- history / manage all leaves (elevated) ----------
+  // ---------- history / manage leaves ----------
   async function loadAllLeaves() {
     const box = document.getElementById('allLeaveList');
     if (!box) return;
-    const leaves = await api('/api/leaves');
+    const leaves = await api(IS_ELEVATED ? '/api/leaves' : '/api/leaves?mine=true');
     if (!leaves.length) {
-      box.innerHTML = '<div class="empty">ยังไม่มีคำขอลาในระบบ</div>';
+      box.innerHTML = '<div class="empty">ยังไม่มีคำขอลา</div>';
       return;
     }
     box.innerHTML = leaves
@@ -391,7 +391,7 @@
             ${attachmentLinkHtml(l)}
           </div>
           <div class="actions">
-            <button class="btn btn-ghost btn-sm" data-edit-leave="${l.id}">แก้ไข</button>
+            ${IS_ELEVATED ? `<button class="btn btn-ghost btn-sm" data-edit-leave="${l.id}">แก้ไข</button>` : ''}
             <button class="btn btn-danger btn-sm" data-delete-leave="${l.id}">ลบ</button>
           </div>
         </div>

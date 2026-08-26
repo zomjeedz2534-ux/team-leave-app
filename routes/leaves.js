@@ -216,10 +216,7 @@ router.delete('/:id', async (req, res) => {
   if (!leave) return res.status(404).json({ error: 'ไม่พบคำขอ' });
   const isElevated = ELEVATED_ROLES.includes(req.session.user.role);
   const isOwner = leave.userId === req.session.user.id;
-  if (!isElevated) {
-    if (!isOwner) return res.status(403).json({ error: 'ไม่มีสิทธิ์' });
-    if (leave.status !== 'pending') return res.status(400).json({ error: 'ยกเลิกได้เฉพาะคำขอที่รออนุมัติ' });
-  }
+  if (!isElevated && !isOwner) return res.status(403).json({ error: 'ไม่มีสิทธิ์' });
 
   if (leave.googleEventId) {
     try {
