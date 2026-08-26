@@ -3,7 +3,7 @@ const { pool } = require('../db');
 const SELECT_COLUMNS = `
   id, user_id, to_char(start_date,'YYYY-MM-DD') as start_date, to_char(end_date,'YYYY-MM-DD') as end_date,
   type, reason, extra_emails, status, created_at, decided_by, decided_at, google_event_id, google_synced,
-  (attachment_data IS NOT NULL) as has_attachment, attachment_filename
+  (attachment_data IS NOT NULL) as has_attachment, attachment_filename, previous_status, pending_delete_reason
 `;
 
 function mapLeave(row) {
@@ -24,6 +24,8 @@ function mapLeave(row) {
     googleSynced: row.google_synced,
     hasAttachment: row.has_attachment,
     attachmentFilename: row.attachment_filename,
+    previousStatus: row.previous_status,
+    pendingDeleteReason: row.pending_delete_reason,
   };
 }
 
@@ -100,6 +102,8 @@ async function updateLeave(id, patch) {
     attachmentData: 'attachment_data',
     attachmentMime: 'attachment_mime',
     attachmentFilename: 'attachment_filename',
+    previousStatus: 'previous_status',
+    pendingDeleteReason: 'pending_delete_reason',
   };
   const sets = [];
   const values = [];

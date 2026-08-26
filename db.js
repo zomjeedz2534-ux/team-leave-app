@@ -38,13 +38,18 @@ async function init() {
       google_synced BOOLEAN NOT NULL DEFAULT false,
       attachment_data TEXT,
       attachment_mime TEXT,
-      attachment_filename TEXT
+      attachment_filename TEXT,
+      previous_status TEXT,
+      pending_delete_reason TEXT
     );
   `);
   // เผื่อฐานข้อมูลเก่าที่สร้างตารางไว้แล้วก่อนมีคอลัมน์ไฟล์แนบ
   await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_data TEXT;`);
   await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_mime TEXT;`);
   await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_filename TEXT;`);
+  // เผื่อฐานข้อมูลเก่าที่สร้างตารางไว้แล้วก่อนมีระบบขออนุมัติลบคำขอที่อนุมัติแล้ว
+  await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS previous_status TEXT;`);
+  await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS pending_delete_reason TEXT;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,

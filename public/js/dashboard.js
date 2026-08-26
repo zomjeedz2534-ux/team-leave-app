@@ -25,7 +25,16 @@
   }
 
   function statusLabel(s) {
-    return { pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ปฏิเสธแล้ว' }[s] || s;
+    return {
+      pending: 'รออนุมัติ',
+      approved: 'อนุมัติแล้ว',
+      rejected: 'ปฏิเสธแล้ว',
+      pending_deletion: 'รออนุมัติการลบ',
+    }[s] || s;
+  }
+
+  function statusTagClass(s) {
+    return s === 'pending_deletion' ? 'status-pending' : 'status-' + s;
   }
 
   function readFileAsDataUrl(file) {
@@ -147,7 +156,7 @@
         const endExclusive = new Date(l.endDate);
         endExclusive.setDate(endExclusive.getDate() + 1);
         return {
-          title: `${l.userName} · ${t.label}${l.status === 'pending' ? ' (รออนุมัติ)' : ''}`,
+          title: `${l.userName} · ${t.label}${l.status === 'pending' ? ' (รออนุมัติ)' : ''}${l.status === 'pending_deletion' ? ' (รออนุมัติการลบ)' : ''}`,
           start: l.startDate,
           end: endExclusive.toISOString().slice(0, 10),
           allDay: true,
@@ -194,7 +203,7 @@
       <div class="list-item upcoming-item">
         <div class="meta">
           <span class="name"><i class="dot" style="background:${t.color}"></i>${escapeHtml(l.userName)}</span>
-          <span class="sub">${t.label} · ${l.startDate} → ${l.endDate}${l.status === 'pending' ? ' (รออนุมัติ)' : ''}</span>
+          <span class="sub">${t.label} · ${l.startDate} → ${l.endDate}${l.status === 'pending' ? ' (รออนุมัติ)' : ''}${l.status === 'pending_deletion' ? ' (รออนุมัติการลบ)' : ''}</span>
         </div>
       </div>`;
       })
@@ -274,14 +283,15 @@
         (l) => `
       <div class="list-item">
         <div class="meta">
-          <span class="name">${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
+          <span class="name">${l.typeLabel} <span class="tag ${statusTagClass(l.status)}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
+          ${l.status === 'pending_deletion' && l.pendingDeleteReason ? `<span class="sub">เหตุผลที่ขอลบ: ${escapeHtml(l.pendingDeleteReason)} (รอ Director/Manager/Senior อนุมัติ)</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
           ${attachmentLinkHtml(l)}
         </div>
         <div class="actions">
-          <button class="btn btn-danger btn-sm" data-cancel="${l.id}">ลบ</button>
+          ${l.status === 'pending_deletion' ? '' : `<button class="btn btn-danger btn-sm" data-cancel="${l.id}">ลบ</button>`}
         </div>
       </div>`
       )
@@ -291,8 +301,8 @@
         const reason = promptDeleteReason();
         if (reason === null) return;
         try {
-          await api('/api/leaves/' + btn.dataset.cancel, { method: 'DELETE', body: JSON.stringify({ reason }) });
-          toast('ลบคำขอแล้ว', 'success');
+          const r = await api('/api/leaves/' + btn.dataset.cancel, { method: 'DELETE', body: JSON.stringify({ reason }) });
+          toast(r && r.pending ? 'ส่งคำขอลบแล้ว รอ Director/Manager/Senior อนุมัติ' : 'ลบคำขอแล้ว', 'success');
           loadMyLeaves();
         } catch (e) {
           toast(e.message, 'error');
@@ -312,29 +322,32 @@
       return;
     }
     box.innerHTML = leaves
-      .map(
-        (l) => `
+      .map((l) => {
+        const isDeletion = l.status === 'pending_deletion';
+        return `
       <div class="list-item">
         <div class="meta">
-          <span class="name">${l.userName} · ${l.typeLabel}${lowAdvanceNoticeTag(l)}</span>
+          <span class="name">${l.userName} · ${l.typeLabel} ${isDeletion ? '<span class="tag status-pending">ขอลบคำขอนี้</span>' : ''}${lowAdvanceNoticeTag(l)}</span>
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
+          ${isDeletion && l.pendingDeleteReason ? `<span class="sub">เหตุผลที่ขอลบ: ${escapeHtml(l.pendingDeleteReason)}</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
           ${attachmentLinkHtml(l)}
         </div>
         <div class="actions">
-          <button class="btn btn-success btn-sm" data-approve="${l.id}">อนุมัติ</button>
-          <button class="btn btn-danger btn-sm" data-reject="${l.id}">ปฏิเสธ</button>
+          <button class="btn btn-success btn-sm" data-approve="${l.id}">${isDeletion ? 'อนุมัติการลบ' : 'อนุมัติ'}</button>
+          <button class="btn btn-danger btn-sm" data-reject="${l.id}">${isDeletion ? 'ไม่อนุมัติการลบ' : 'ปฏิเสธ'}</button>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join('');
     box.querySelectorAll('[data-approve]').forEach((btn) =>
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
           const r = await api('/api/leaves/' + btn.dataset.approve + '/approve', { method: 'POST' });
-          if (r.googleSynced) toast('อนุมัติแล้ว และเพิ่มลง Google Calendar สำเร็จ', 'success');
+          if (r.deleted) toast('อนุมัติการลบแล้ว', 'success');
+          else if (r.googleSynced) toast('อนุมัติแล้ว และเพิ่มลง Google Calendar สำเร็จ', 'success');
           else toast('อนุมัติแล้ว แต่ยังไม่ได้ซิงก์ Google Calendar' + (r.googleError ? ': ' + r.googleError : ''), 'error');
           loadPending();
         } catch (e) {
@@ -346,8 +359,8 @@
     box.querySelectorAll('[data-reject]').forEach((btn) =>
       btn.addEventListener('click', async () => {
         try {
-          await api('/api/leaves/' + btn.dataset.reject + '/reject', { method: 'POST' });
-          toast('ปฏิเสธคำขอแล้ว', 'success');
+          const r = await api('/api/leaves/' + btn.dataset.reject + '/reject', { method: 'POST' });
+          toast(r && r.reverted ? 'ไม่อนุมัติการลบ คืนสถานะคำขอเดิมแล้ว' : 'ปฏิเสธคำขอแล้ว', 'success');
           loadPending();
         } catch (e) {
           toast(e.message, 'error');
@@ -507,19 +520,21 @@
       return;
     }
     box.innerHTML = leaves
-      .map(
-        (l) => `
+      .map((l) => {
+        const isDeletion = l.status === 'pending_deletion';
+        return `
       <div class="list-item" data-leave-item="${l.id}">
         <div class="view-mode">
           <div class="meta">
-            <span class="name">${escapeHtml(l.userName)} · ${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
+            <span class="name">${escapeHtml(l.userName)} · ${l.typeLabel} <span class="tag ${statusTagClass(l.status)}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
             <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
             ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
+            ${isDeletion && l.pendingDeleteReason ? `<span class="sub">เหตุผลที่ขอลบ: ${escapeHtml(l.pendingDeleteReason)} — ไปที่แท็บ "อนุมัติคำขอ" เพื่อตัดสินใจ</span>` : ''}
             ${attachmentLinkHtml(l)}
           </div>
           <div class="actions">
-            ${IS_ELEVATED ? `<button class="btn btn-ghost btn-sm" data-edit-leave="${l.id}">แก้ไข</button>` : ''}
-            <button class="btn btn-danger btn-sm" data-delete-leave="${l.id}">ลบ</button>
+            ${isDeletion ? '' : (IS_ELEVATED ? `<button class="btn btn-ghost btn-sm" data-edit-leave="${l.id}">แก้ไข</button>` : '')}
+            ${isDeletion ? '' : `<button class="btn btn-danger btn-sm" data-delete-leave="${l.id}">ลบ</button>`}
           </div>
         </div>
         <div class="edit-mode" style="display:none">
@@ -534,8 +549,8 @@
             <button class="btn btn-ghost btn-sm" data-cancel-edit="${l.id}">ยกเลิก</button>
           </div>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join('');
 
     box.querySelectorAll('[data-edit-leave]').forEach((btn) =>
@@ -595,8 +610,26 @@
       box.innerHTML = '<div class="empty">ยังไม่มีประวัติการดำเนินการ</div>';
       return;
     }
-    const actionLabel = { approved: 'อนุมัติ', rejected: 'ปฏิเสธ', edited: 'แก้ไข', deleted: 'ลบ', cancelled: 'ยกเลิก' };
-    const actionTag = { approved: 'approved', rejected: 'rejected', deleted: 'rejected', edited: 'pending', cancelled: 'pending' };
+    const actionLabel = {
+      approved: 'อนุมัติ',
+      rejected: 'ปฏิเสธ',
+      edited: 'แก้ไข',
+      deleted: 'ลบ',
+      cancelled: 'ยกเลิก',
+      deletion_requested: 'ขอลบ (รออนุมัติ)',
+      deletion_approved: 'อนุมัติการลบ',
+      deletion_rejected: 'ไม่อนุมัติการลบ',
+    };
+    const actionTag = {
+      approved: 'approved',
+      rejected: 'rejected',
+      deleted: 'rejected',
+      edited: 'pending',
+      cancelled: 'pending',
+      deletion_requested: 'pending',
+      deletion_approved: 'rejected',
+      deletion_rejected: 'approved',
+    };
     box.innerHTML = history
       .map((h) => {
         const d = h.detail || {};

@@ -62,7 +62,12 @@ function parseAttachment(dataUrl, filename) {
 router.get('/', async (req, res) => {
   const { status, mine } = req.query;
   let leaves = await getAllLeaves();
-  if (status) leaves = leaves.filter((l) => l.status === status);
+  // status=pending รวมคำขอลาใหม่ (pending) และคำขอลบที่รออนุมัติ (pending_deletion) ไว้ในลิสต์เดียวกัน
+  if (status === 'pending') {
+    leaves = leaves.filter((l) => l.status === 'pending' || l.status === 'pending_deletion');
+  } else if (status) {
+    leaves = leaves.filter((l) => l.status === status);
+  }
   if (mine === 'true') leaves = leaves.filter((l) => l.userId === req.session.user.id);
   const users = await getAllUsers();
   if (status === 'pending' && mine !== 'true') {
@@ -219,9 +224,33 @@ router.delete('/:id', async (req, res) => {
   const isElevated = ELEVATED_ROLES.includes(req.session.user.role);
   const isOwner = leave.userId === req.session.user.id;
   if (!isElevated && !isOwner) return res.status(403).json({ error: 'ไม่มีสิทธิ์' });
+  if (leave.status === 'pending_deletion') {
+    return res.status(400).json({ error: 'คำขอนี้อยู่ระหว่างรออนุมัติการลบอยู่แล้ว' });
+  }
 
   const deleteReason = (req.body && req.body.reason ? req.body.reason : '').trim();
   if (!deleteReason) return res.status(400).json({ error: 'กรุณาระบุเหตุผลที่ลบคำขอนี้' });
+
+  const requester = await getUserById(leave.userId);
+
+  // สมาชิกทั่วไปขอลบคำขอที่ "อนุมัติแล้ว" ของตัวเอง ต้องรอ Director/Manager/Senior อนุมัติการลบก่อน ไม่ลบทันที
+  if (!isElevated && leave.status === 'approved') {
+    await updateLeave(req.params.id, {
+      status: 'pending_deletion',
+      previousStatus: leave.status,
+      pendingDeleteReason: deleteReason,
+    });
+    await logAction({
+      leaveId: leave.id,
+      action: 'deletion_requested',
+      actorId: req.session.user.id,
+      actorName: req.session.user.name,
+      targetUserId: leave.userId,
+      targetUserName: requester ? requester.name : 'ไม่ทราบชื่อ',
+      detail: { type: leave.type, startDate: leave.startDate, endDate: leave.endDate, deleteReason },
+    });
+    return res.json({ ok: true, pending: true });
+  }
 
   if (leave.googleEventId) {
     try {
@@ -231,7 +260,6 @@ router.delete('/:id', async (req, res) => {
     }
   }
 
-  const requester = await getUserById(leave.userId);
   await deleteLeave(req.params.id);
   await logAction({
     leaveId: leave.id,
@@ -255,12 +283,41 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/approve', requireElevated, async (req, res) => {
   const leave = await getLeaveById(req.params.id);
   if (!leave) return res.status(404).json({ error: 'ไม่พบคำขอ' });
-  if (leave.status !== 'pending') return res.status(400).json({ error: 'คำขอนี้ถูกดำเนินการแล้ว' });
 
   const requester = await getUserById(leave.userId);
   if (!requester || !canApprove(req.session.user.role, requester.role)) {
-    return res.status(403).json({ error: 'ตำแหน่งของคุณไม่มีสิทธิ์อนุมัติคำขอลาของตำแหน่งนี้' });
+    return res.status(403).json({ error: 'ตำแหน่งของคุณไม่มีสิทธิ์ดำเนินการกับคำขอลาของตำแหน่งนี้' });
   }
+
+  // อนุมัติ "คำขอลบ" -> ลบคำขอลาจริง (และลบ event ใน Google Calendar ถ้ามี)
+  if (leave.status === 'pending_deletion') {
+    if (leave.googleEventId) {
+      try {
+        await googleCal.deleteLeaveEvent(leave.googleEventId);
+      } catch (e) {
+        // ไม่ block การลบฝั่งระบบแม้ลบใน Google Calendar ไม่สำเร็จ
+      }
+    }
+    await deleteLeave(req.params.id);
+    await logAction({
+      leaveId: leave.id,
+      action: 'deletion_approved',
+      actorId: req.session.user.id,
+      actorName: req.session.user.name,
+      targetUserId: leave.userId,
+      targetUserName: requester.name,
+      detail: {
+        type: leave.type,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        previousStatus: leave.previousStatus,
+        deleteReason: leave.pendingDeleteReason,
+      },
+    });
+    return res.json({ ok: true, deleted: true });
+  }
+
+  if (leave.status !== 'pending') return res.status(400).json({ error: 'คำขอนี้ถูกดำเนินการแล้ว' });
   const approver = req.session.user;
   let googleEventId = null;
   let googleSynced = false;
@@ -296,12 +353,37 @@ router.post('/:id/approve', requireElevated, async (req, res) => {
 router.post('/:id/reject', requireElevated, async (req, res) => {
   const leave = await getLeaveById(req.params.id);
   if (!leave) return res.status(404).json({ error: 'ไม่พบคำขอ' });
-  if (leave.status !== 'pending') return res.status(400).json({ error: 'คำขอนี้ถูกดำเนินการแล้ว' });
 
   const requester = await getUserById(leave.userId);
   if (!requester || !canApprove(req.session.user.role, requester.role)) {
-    return res.status(403).json({ error: 'ตำแหน่งของคุณไม่มีสิทธิ์ปฏิเสธคำขอลาของตำแหน่งนี้' });
+    return res.status(403).json({ error: 'ตำแหน่งของคุณไม่มีสิทธิ์ดำเนินการกับคำขอลาของตำแหน่งนี้' });
   }
+
+  // ปฏิเสธ "คำขอลบ" -> คืนสถานะคำขอลาเดิมกลับไป ไม่ลบจริง
+  if (leave.status === 'pending_deletion') {
+    await updateLeave(req.params.id, {
+      status: leave.previousStatus || 'approved',
+      previousStatus: null,
+      pendingDeleteReason: null,
+    });
+    await logAction({
+      leaveId: leave.id,
+      action: 'deletion_rejected',
+      actorId: req.session.user.id,
+      actorName: req.session.user.name,
+      targetUserId: leave.userId,
+      targetUserName: requester.name,
+      detail: {
+        type: leave.type,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        deleteReason: leave.pendingDeleteReason,
+      },
+    });
+    return res.json({ ok: true, reverted: true });
+  }
+
+  if (leave.status !== 'pending') return res.status(400).json({ error: 'คำขอนี้ถูกดำเนินการแล้ว' });
 
   await updateLeave(req.params.id, {
     status: 'rejected',
