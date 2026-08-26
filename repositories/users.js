@@ -65,4 +65,8 @@ async function updateUser(id, patch) {
   await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = $${i}`, values);
 }
 
-module.exports = { getAllUsers, getUserById, getUserByEmail, createUser, updateUser };
+async function deleteUser(id) {
+  await pool.query('DELETE FROM users WHERE id = $1', [id]);
+}
+
+module.exports = { getAllUsers, getUserById, getUserByEmail, createUser, updateUser, deleteUser };

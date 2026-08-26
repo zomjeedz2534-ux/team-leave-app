@@ -5,7 +5,8 @@ const router = express.Router();
 const { requireElevated } = require('../middleware/auth');
 const { DEFAULT_QUOTAS, ROLES } = require('../constants');
 const { remainingForUser } = require('../services/leaveCalc');
-const { getAllUsers, getUserById, getUserByEmail, createUser, updateUser } = require('../repositories/users');
+const { getAllUsers, getUserById, getUserByEmail, createUser, updateUser, deleteUser } = require('../repositories/users');
+const { deleteLeavesByUser } = require('../repositories/leaves');
 
 const ROLE_KEYS = ROLES.map((r) => r.key);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -69,6 +70,23 @@ router.patch('/:id', requireElevated, async (req, res) => {
   if (req.body.quotas) patch.quotas = { ...user.quotas, ...req.body.quotas };
   if (req.body.role && ROLE_KEYS.includes(req.body.role)) patch.role = req.body.role;
   await updateUser(req.params.id, patch);
+  res.json({ ok: true });
+});
+
+router.delete('/:id', requireElevated, async (req, res) => {
+  if (req.params.id === req.session.user.id) {
+    return res.status(400).json({ error: 'ลบบัญชีของตัวเองไม่ได้' });
+  }
+  const user = await getUserById(req.params.id);
+  if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+  if (user.role === 'director') {
+    const directorCount = (await getAllUsers()).filter((u) => u.role === 'director').length;
+    if (directorCount <= 1) {
+      return res.status(400).json({ error: 'ต้องมี Director อย่างน้อย 1 คนเสมอ ลบคนนี้ไม่ได้' });
+    }
+  }
+  await deleteLeavesByUser(req.params.id);
+  await deleteUser(req.params.id);
   res.json({ ok: true });
 });
 

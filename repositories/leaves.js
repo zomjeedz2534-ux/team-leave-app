@@ -91,4 +91,16 @@ async function deleteLeave(id) {
   await pool.query('DELETE FROM leaves WHERE id = $1', [id]);
 }
 
-module.exports = { getAllLeaves, getLeaveById, getApprovedLeavesForUser, createLeave, updateLeave, deleteLeave };
+async function deleteLeavesByUser(userId) {
+  await pool.query('DELETE FROM leaves WHERE user_id = $1', [userId]);
+}
+
+module.exports = {
+  getAllLeaves,
+  getLeaveById,
+  getApprovedLeavesForUser,
+  createLeave,
+  updateLeave,
+  deleteLeave,
+  deleteLeavesByUser,
+};

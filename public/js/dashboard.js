@@ -247,7 +247,10 @@
         const q = (u.quotas && u.quotas[t.key] != null) ? u.quotas[t.key] : 0;
         html += `<td><input type="number" min="0" step="0.5" data-quota="${t.key}" value="${q}" style="width:80px" /></td>`;
       });
-      html += `<td><button class="btn btn-primary btn-sm" data-save-user="${u.id}">บันทึก</button></td></tr>`;
+      html += `<td style="display:flex; gap:6px">
+          <button class="btn btn-primary btn-sm" data-save-user="${u.id}">บันทึก</button>
+          ${u.id !== USER.id ? `<button class="btn btn-danger btn-sm" data-delete-user="${u.id}">ลบ</button>` : ''}
+        </td></tr>`;
     });
     html += '</tbody></table>';
     box.innerHTML = html;
@@ -266,6 +269,21 @@
             body: JSON.stringify({ quotas, role }),
           });
           toast('บันทึกสิทธิวันลาแล้ว', 'success');
+        } catch (e) {
+          toast(e.message, 'error');
+        }
+      })
+    );
+
+    box.querySelectorAll('[data-delete-user]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const row = box.querySelector(`tr[data-user="${btn.dataset.deleteUser}"]`);
+        const name = row.querySelector('td').textContent;
+        if (!confirm(`ลบ "${name}" ออกจากทีม? ประวัติการลาของคนนี้จะถูกลบไปด้วย และย้อนกลับไม่ได้`)) return;
+        try {
+          await api('/api/users/' + btn.dataset.deleteUser, { method: 'DELETE' });
+          toast('ลบสมาชิกแล้ว', 'success');
+          loadTeamQuotas();
         } catch (e) {
           toast(e.message, 'error');
         }
