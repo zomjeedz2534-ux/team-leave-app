@@ -301,6 +301,7 @@
         await api('/api/users', { method: 'POST', body: JSON.stringify(Object.fromEntries(fd.entries())) });
         toast('เพิ่มสมาชิกทีมสำเร็จ', 'success');
         addUserForm.reset();
+        loadTeamQuotas();
       } catch (e) {
         toast(e.message, 'error');
       }
