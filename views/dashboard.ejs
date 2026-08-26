@@ -65,6 +65,9 @@
                 <option value="<%= t.key %>"><%= t.label %></option>
               <% }) %>
             </select>
+            <div id="advanceNoticeWarning" class="alert alert-warn" style="display:none">
+              ⚠️ นโยบายบริษัทกำหนดให้ลาพักร้อนล่วงหน้าอย่างน้อย 30 วัน คำขอนี้แจ้งล่วงหน้าไม่ถึง 30 วัน ยังส่งคำขอได้ตามปกติ แต่ผู้อนุมัติจะเห็นป้ายแจ้งเตือนนี้ด้วย
+            </div>
             <label>เหตุผล</label>
             <textarea name="reason" rows="3" placeholder="ระบุเหตุผลการลา (ไม่บังคับ)"></textarea>
             <label>อีเมลที่ต้องการ tag เพิ่มเติมใน Google Calendar</label>

@@ -73,11 +73,13 @@ router.get('/', async (req, res) => {
   }
   const enriched = leaves.map((l) => {
     const u = users.find((u) => u.id === l.userId);
+    const advanceDays = dayjs(l.startDate).diff(dayjs(l.createdAt), 'day');
     return {
       ...l,
       userName: u ? u.name : 'ไม่ทราบชื่อ',
       typeLabel: leaveTypeLabel(l.type),
       days: countBusinessDays(l.startDate, l.endDate),
+      lowAdvanceNotice: l.type === 'vacation' && advanceDays < 30,
     };
   });
   res.json(enriched);
@@ -218,6 +220,9 @@ router.delete('/:id', async (req, res) => {
   const isOwner = leave.userId === req.session.user.id;
   if (!isElevated && !isOwner) return res.status(403).json({ error: 'ไม่มีสิทธิ์' });
 
+  const deleteReason = (req.body && req.body.reason ? req.body.reason : '').trim();
+  if (!deleteReason) return res.status(400).json({ error: 'กรุณาระบุเหตุผลที่ลบคำขอนี้' });
+
   if (leave.googleEventId) {
     try {
       await googleCal.deleteLeaveEvent(leave.googleEventId);
@@ -235,7 +240,13 @@ router.delete('/:id', async (req, res) => {
     actorName: req.session.user.name,
     targetUserId: leave.userId,
     targetUserName: requester ? requester.name : 'ไม่ทราบชื่อ',
-    detail: { type: leave.type, startDate: leave.startDate, endDate: leave.endDate, previousStatus: leave.status },
+    detail: {
+      type: leave.type,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      previousStatus: leave.status,
+      deleteReason,
+    },
   });
 
   res.json({ ok: true });

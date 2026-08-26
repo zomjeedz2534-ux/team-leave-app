@@ -161,6 +161,7 @@ textarea { resize: vertical; }
 .alert { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
 .alert-error { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
 .alert-success { background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
+.alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 
 .toast {
   position: fixed;
@@ -206,6 +207,7 @@ textarea { resize: vertical; }
 .status-pending { background: var(--warn); }
 .status-approved { background: var(--success); }
 .status-rejected { background: var(--danger); }
+.status-warn { background: var(--warn); }
 
 .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
 

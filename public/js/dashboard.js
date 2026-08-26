@@ -42,6 +42,23 @@
     return `<span class="sub"><a href="/api/leaves/${l.id}/attachment" target="_blank" rel="noopener">📎 ดูไฟล์แนบ</a></span>`;
   }
 
+  function lowAdvanceNoticeTag(l) {
+    if (!l.lowAdvanceNotice) return '';
+    return ' <span class="tag status-warn">แจ้งไม่ถึง 30 วัน</span>';
+  }
+
+  // บังคับให้กรอกเหตุผลก่อนลบคำขอลาทุกครั้ง คืนค่า null ถ้าผู้ใช้กดยกเลิก
+  function promptDeleteReason() {
+    let reason = '';
+    while (true) {
+      reason = window.prompt('กรุณาระบุเหตุผลที่ลบคำขอนี้ (จำเป็นต้องกรอก):', reason || '');
+      if (reason === null) return null;
+      reason = reason.trim();
+      if (reason) return reason;
+      window.alert('กรุณาระบุเหตุผล ห้ามเว้นว่าง');
+    }
+  }
+
   // ---------- notifications: someone deleted their own already-approved leave ----------
   const NOTIF_SEEN_KEY = 'teamLeaveApp_historyLastSeenAt';
   const toastedHistoryIds = new Set();
@@ -187,6 +204,26 @@
   // ---------- request form ----------
   const leaveForm = document.getElementById('leaveForm');
   const attachmentInput = document.getElementById('attachmentInput');
+  const startDateInput = document.getElementById('startDate');
+  const leaveTypeSelect = document.getElementById('leaveType');
+  const advanceNoticeWarning = document.getElementById('advanceNoticeWarning');
+
+  function updateAdvanceNoticeWarning() {
+    if (!advanceNoticeWarning || !startDateInput || !leaveTypeSelect) return;
+    const startVal = startDateInput.value;
+    if (!startVal || leaveTypeSelect.value !== 'vacation') {
+      advanceNoticeWarning.style.display = 'none';
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(startVal + 'T00:00:00');
+    const diffDays = Math.round((start - today) / (1000 * 60 * 60 * 24));
+    advanceNoticeWarning.style.display = diffDays < 30 ? 'block' : 'none';
+  }
+  if (startDateInput) startDateInput.addEventListener('change', updateAdvanceNoticeWarning);
+  if (leaveTypeSelect) leaveTypeSelect.addEventListener('change', updateAdvanceNoticeWarning);
+
   leaveForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(leaveForm);
@@ -218,6 +255,7 @@
       });
       toast('ส่งคำขอลาสำเร็จ', 'success');
       leaveForm.reset();
+      updateAdvanceNoticeWarning();
       loadMyLeaves();
     } catch (e) {
       toast(e.message, 'error');
@@ -236,23 +274,25 @@
         (l) => `
       <div class="list-item">
         <div class="meta">
-          <span class="name">${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span></span>
+          <span class="name">${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
           ${attachmentLinkHtml(l)}
         </div>
         <div class="actions">
-          ${l.status === 'pending' ? `<button class="btn btn-danger btn-sm" data-cancel="${l.id}">ยกเลิก</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-cancel="${l.id}">ลบ</button>
         </div>
       </div>`
       )
       .join('');
     box.querySelectorAll('[data-cancel]').forEach((btn) =>
       btn.addEventListener('click', async () => {
+        const reason = promptDeleteReason();
+        if (reason === null) return;
         try {
-          await api('/api/leaves/' + btn.dataset.cancel, { method: 'DELETE' });
-          toast('ยกเลิกคำขอแล้ว', 'success');
+          await api('/api/leaves/' + btn.dataset.cancel, { method: 'DELETE', body: JSON.stringify({ reason }) });
+          toast('ลบคำขอแล้ว', 'success');
           loadMyLeaves();
         } catch (e) {
           toast(e.message, 'error');
@@ -276,7 +316,7 @@
         (l) => `
       <div class="list-item">
         <div class="meta">
-          <span class="name">${l.userName} · ${l.typeLabel}</span>
+          <span class="name">${l.userName} · ${l.typeLabel}${lowAdvanceNoticeTag(l)}</span>
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
@@ -472,7 +512,7 @@
       <div class="list-item" data-leave-item="${l.id}">
         <div class="view-mode">
           <div class="meta">
-            <span class="name">${escapeHtml(l.userName)} · ${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span></span>
+            <span class="name">${escapeHtml(l.userName)} · ${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span>${lowAdvanceNoticeTag(l)}</span>
             <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
             ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
             ${attachmentLinkHtml(l)}
@@ -533,9 +573,10 @@
     );
     box.querySelectorAll('[data-delete-leave]').forEach((btn) =>
       btn.addEventListener('click', async () => {
-        if (!confirm('ลบคำขอลานี้ถาวร? ถ้า sync ขึ้น Google Calendar ไว้แล้วจะลบ event ออกด้วย ย้อนกลับไม่ได้')) return;
+        const reason = promptDeleteReason();
+        if (reason === null) return;
         try {
-          await api('/api/leaves/' + btn.dataset.deleteLeave, { method: 'DELETE' });
+          await api('/api/leaves/' + btn.dataset.deleteLeave, { method: 'DELETE', body: JSON.stringify({ reason }) });
           toast('ลบคำขอลาแล้ว', 'success');
           loadAllLeaves();
           if (IS_ELEVATED) loadHistoryLog();
@@ -566,6 +607,7 @@
         <div class="meta">
           <span class="name">${escapeHtml(h.actorName)} <span class="tag status-${actionTag[h.action] || 'pending'}">${actionLabel[h.action] || h.action}</span></span>
           <span class="sub">คำขอลาของ ${escapeHtml(h.targetUserName)}${h.typeLabel ? ' · ' + h.typeLabel : ''}${dates ? ' · ' + dates : ''}</span>
+          ${d.deleteReason ? `<span class="sub">เหตุผลที่ลบ: ${escapeHtml(d.deleteReason)}</span>` : ''}
           <span class="sub muted">${new Date(h.createdAt).toLocaleString('th-TH')}</span>
         </div>
       </div>`;
