@@ -28,6 +28,20 @@
     return { pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ปฏิเสธแล้ว' }[s] || s;
   }
 
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function attachmentLinkHtml(l) {
+    if (!l.hasAttachment) return '';
+    return `<span class="sub"><a href="/api/leaves/${l.id}/attachment" target="_blank" rel="noopener">📎 ดูไฟล์แนบ</a></span>`;
+  }
+
   // ---------- tabs ----------
   const tabBtns = document.querySelectorAll('.tab-btn');
   tabBtns.forEach((btn) => {
@@ -42,6 +56,7 @@
     if (tab === 'pending') loadPending();
     if (tab === 'balance') loadBalance();
     if (tab === 'team') { loadGoogleStatus(); loadTeamQuotas(); }
+    if (tab === 'history') { loadAllLeaves(); loadHistoryLog(); }
   }
 
   // ---------- legend ----------
@@ -90,13 +105,29 @@
 
   // ---------- request form ----------
   const leaveForm = document.getElementById('leaveForm');
+  const attachmentInput = document.getElementById('attachmentInput');
   leaveForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(leaveForm);
+    const payload = Object.fromEntries(fd.entries());
+    const file = attachmentInput && attachmentInput.files[0];
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        toast('ไฟล์ใหญ่เกินไป (ไม่เกิน 4MB)', 'error');
+        return;
+      }
+      try {
+        payload.attachmentDataUrl = await readFileAsDataUrl(file);
+        payload.attachmentFilename = file.name;
+      } catch (err) {
+        toast('อ่านไฟล์แนบไม่สำเร็จ', 'error');
+        return;
+      }
+    }
     try {
       await api('/api/leaves', {
         method: 'POST',
-        body: JSON.stringify(Object.fromEntries(fd.entries())),
+        body: JSON.stringify(payload),
       });
       toast('ส่งคำขอลาสำเร็จ', 'success');
       leaveForm.reset();
@@ -122,6 +153,7 @@
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
+          ${attachmentLinkHtml(l)}
         </div>
         <div class="actions">
           ${l.status === 'pending' ? `<button class="btn btn-danger btn-sm" data-cancel="${l.id}">ยกเลิก</button>` : ''}
@@ -161,6 +193,7 @@
           <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
           ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
           ${l.extraEmails && l.extraEmails.length ? `<span class="sub">Tag: ${l.extraEmails.map(escapeHtml).join(', ')}</span>` : ''}
+          ${attachmentLinkHtml(l)}
         </div>
         <div class="actions">
           <button class="btn btn-success btn-sm" data-approve="${l.id}">อนุมัติ</button>
@@ -335,6 +368,120 @@
       toast('ยกเลิกการเชื่อมต่อ Google Calendar แล้ว', 'success');
       loadGoogleStatus();
     });
+  }
+
+  // ---------- history / manage all leaves (elevated) ----------
+  async function loadAllLeaves() {
+    const box = document.getElementById('allLeaveList');
+    if (!box) return;
+    const leaves = await api('/api/leaves');
+    if (!leaves.length) {
+      box.innerHTML = '<div class="empty">ยังไม่มีคำขอลาในระบบ</div>';
+      return;
+    }
+    box.innerHTML = leaves
+      .map(
+        (l) => `
+      <div class="list-item" data-leave-item="${l.id}">
+        <div class="view-mode">
+          <div class="meta">
+            <span class="name">${escapeHtml(l.userName)} · ${l.typeLabel} <span class="tag status-${l.status}">${statusLabel(l.status)}</span></span>
+            <span class="sub">${l.startDate} → ${l.endDate} (${l.days} วันทำการ)</span>
+            ${l.reason ? `<span class="sub">เหตุผล: ${escapeHtml(l.reason)}</span>` : ''}
+            ${attachmentLinkHtml(l)}
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost btn-sm" data-edit-leave="${l.id}">แก้ไข</button>
+            <button class="btn btn-danger btn-sm" data-delete-leave="${l.id}">ลบ</button>
+          </div>
+        </div>
+        <div class="edit-mode" style="display:none">
+          <div class="edit-grid">
+            <label>วันที่เริ่ม<input type="date" data-f="startDate" value="${l.startDate}" /></label>
+            <label>วันที่สิ้นสุด<input type="date" data-f="endDate" value="${l.endDate}" /></label>
+            <label>ประเภท<select data-f="type">${LEAVE_TYPES.map((t) => `<option value="${t.key}" ${t.key === l.type ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
+            <label>เหตุผล<input type="text" data-f="reason" value="${escapeHtml(l.reason)}" /></label>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm" data-save-edit="${l.id}">บันทึก</button>
+            <button class="btn btn-ghost btn-sm" data-cancel-edit="${l.id}">ยกเลิก</button>
+          </div>
+        </div>
+      </div>`
+      )
+      .join('');
+
+    box.querySelectorAll('[data-edit-leave]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const item = box.querySelector(`[data-leave-item="${btn.dataset.editLeave}"]`);
+        item.querySelector('.view-mode').style.display = 'none';
+        item.querySelector('.edit-mode').style.display = 'block';
+      })
+    );
+    box.querySelectorAll('[data-cancel-edit]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const item = box.querySelector(`[data-leave-item="${btn.dataset.cancelEdit}"]`);
+        item.querySelector('.edit-mode').style.display = 'none';
+        item.querySelector('.view-mode').style.display = 'flex';
+      })
+    );
+    box.querySelectorAll('[data-save-edit]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.saveEdit;
+        const item = box.querySelector(`[data-leave-item="${id}"]`);
+        const patch = {};
+        item.querySelectorAll('[data-f]').forEach((input) => {
+          patch[input.dataset.f] = input.value;
+        });
+        try {
+          const r = await api('/api/leaves/' + id, { method: 'PATCH', body: JSON.stringify(patch) });
+          if (r.googleError) toast('บันทึกแล้ว แต่อัปเดต Google Calendar ไม่สำเร็จ: ' + r.googleError, 'error');
+          else toast('บันทึกการแก้ไขแล้ว', 'success');
+          loadAllLeaves();
+        } catch (e) {
+          toast(e.message, 'error');
+        }
+      })
+    );
+    box.querySelectorAll('[data-delete-leave]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        if (!confirm('ลบคำขอลานี้ถาวร? ถ้า sync ขึ้น Google Calendar ไว้แล้วจะลบ event ออกด้วย ย้อนกลับไม่ได้')) return;
+        try {
+          await api('/api/leaves/' + btn.dataset.deleteLeave, { method: 'DELETE' });
+          toast('ลบคำขอลาแล้ว', 'success');
+          loadAllLeaves();
+        } catch (e) {
+          toast(e.message, 'error');
+        }
+      })
+    );
+  }
+
+  async function loadHistoryLog() {
+    const box = document.getElementById('historyLog');
+    if (!box) return;
+    const history = await api('/api/leaves/history');
+    if (!history.length) {
+      box.innerHTML = '<div class="empty">ยังไม่มีประวัติการดำเนินการ</div>';
+      return;
+    }
+    const actionLabel = { approved: 'อนุมัติ', rejected: 'ปฏิเสธ', edited: 'แก้ไข', deleted: 'ลบ', cancelled: 'ยกเลิก' };
+    const actionTag = { approved: 'approved', rejected: 'rejected', deleted: 'rejected', edited: 'pending', cancelled: 'pending' };
+    box.innerHTML = history
+      .map((h) => {
+        const d = h.detail || {};
+        const after = d.after || d;
+        const dates = after.startDate ? `${after.startDate} → ${after.endDate || after.startDate}` : '';
+        return `
+      <div class="list-item">
+        <div class="meta">
+          <span class="name">${escapeHtml(h.actorName)} <span class="tag status-${actionTag[h.action] || 'pending'}">${actionLabel[h.action] || h.action}</span></span>
+          <span class="sub">คำขอลาของ ${escapeHtml(h.targetUserName)}${h.typeLabel ? ' · ' + h.typeLabel : ''}${dates ? ' · ' + dates : ''}</span>
+          <span class="sub muted">${new Date(h.createdAt).toLocaleString('th-TH')}</span>
+        </div>
+      </div>`;
+      })
+      .join('');
   }
 
   // ---------- account ----------

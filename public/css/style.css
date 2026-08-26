@@ -181,6 +181,23 @@ textarea { resize: vertical; }
 
 .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
 
+.list-item .view-mode {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.list-item .edit-mode { width: 100%; }
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.edit-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.edit-grid input, .edit-grid select { font-size: 13px; padding: 6px 8px; }
+
 /* ---------- Table ---------- */
 table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }

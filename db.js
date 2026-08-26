@@ -35,13 +35,33 @@ async function init() {
       decided_by TEXT,
       decided_at TIMESTAMPTZ,
       google_event_id TEXT,
-      google_synced BOOLEAN NOT NULL DEFAULT false
+      google_synced BOOLEAN NOT NULL DEFAULT false,
+      attachment_data TEXT,
+      attachment_mime TEXT,
+      attachment_filename TEXT
     );
   `);
+  // เผื่อฐานข้อมูลเก่าที่สร้างตารางไว้แล้วก่อนมีคอลัมน์ไฟล์แนบ
+  await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_data TEXT;`);
+  await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_mime TEXT;`);
+  await pool.query(`ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachment_filename TEXT;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value JSONB
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS leave_history (
+      id TEXT PRIMARY KEY,
+      leave_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      actor_id TEXT,
+      actor_name TEXT NOT NULL,
+      target_user_id TEXT,
+      target_user_name TEXT NOT NULL,
+      detail JSONB NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
 }

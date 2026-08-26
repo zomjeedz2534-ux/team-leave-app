@@ -30,4 +30,17 @@ function canApprove(approverRole, requesterRole) {
   return false;
 }
 
-module.exports = { LEAVE_TYPES, DEFAULT_QUOTAS, ROLES, ELEVATED_ROLES, ROLE_RANK, canApprove };
+// จำกัดขนาดไฟล์แนบ (เก็บเป็น base64 ในฐานข้อมูลโดยตรง ไม่ใช้ storage แยก)
+const ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024; // 4MB
+const ATTACHMENT_ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
+
+module.exports = {
+  LEAVE_TYPES,
+  DEFAULT_QUOTAS,
+  ROLES,
+  ELEVATED_ROLES,
+  ROLE_RANK,
+  canApprove,
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_ALLOWED_MIME,
+};

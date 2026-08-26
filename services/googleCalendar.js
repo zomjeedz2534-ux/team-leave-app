@@ -55,12 +55,7 @@ async function getAuthorizedClient() {
   return client;
 }
 
-// สร้าง event แบบ all-day ใน Google Calendar หลัก ("ฉัน") แล้ว tag อีเมลที่เกี่ยวข้องเป็น attendee
-async function createLeaveEvent(leave, requester, approver) {
-  const auth = await getAuthorizedClient();
-  if (!auth) throw new Error('ยังไม่ได้เชื่อมต่อ Google Calendar');
-  const calendar = google.calendar({ version: 'v3', auth });
-
+function buildEventPayload(leave, requester, approver) {
   const attendees = [];
   const seen = new Set();
   [requester, approver].forEach((p) => {
@@ -76,14 +71,21 @@ async function createLeaveEvent(leave, requester, approver) {
     }
   });
 
-  const event = {
+  return {
     summary: `ลา: ${requester ? requester.name : ''} (${leaveTypeLabel(leave.type)})`,
     description: leave.reason || '',
     start: { date: leave.startDate },
     end: { date: dayjs(leave.endDate).add(1, 'day').format('YYYY-MM-DD') },
     attendees,
   };
+}
 
+// สร้าง event แบบ all-day ใน Google Calendar หลัก ("ฉัน") แล้ว tag อีเมลที่เกี่ยวข้องเป็น attendee
+async function createLeaveEvent(leave, requester, approver) {
+  const auth = await getAuthorizedClient();
+  if (!auth) throw new Error('ยังไม่ได้เชื่อมต่อ Google Calendar');
+  const calendar = google.calendar({ version: 'v3', auth });
+  const event = buildEventPayload(leave, requester, approver);
   const result = await calendar.events.insert({
     calendarId: 'primary',
     requestBody: event,
@@ -92,4 +94,40 @@ async function createLeaveEvent(leave, requester, approver) {
   return result.data.id;
 }
 
-module.exports = { getAuthUrl, handleCallback, isConnected, disconnect, createLeaveEvent };
+// อัปเดต event เดิมเมื่อมีการแก้ไขคำขอลาที่ sync ไปแล้ว
+async function updateLeaveEvent(eventId, leave, requester, approver) {
+  const auth = await getAuthorizedClient();
+  if (!auth) throw new Error('ยังไม่ได้เชื่อมต่อ Google Calendar');
+  const calendar = google.calendar({ version: 'v3', auth });
+  const event = buildEventPayload(leave, requester, approver);
+  await calendar.events.update({
+    calendarId: 'primary',
+    eventId,
+    requestBody: event,
+    sendUpdates: 'all',
+  });
+}
+
+// ลบ event ออกจาก Google Calendar เมื่อลบ/ยกเลิกคำขอลาที่ sync ไปแล้ว
+async function deleteLeaveEvent(eventId) {
+  const auth = await getAuthorizedClient();
+  if (!auth) throw new Error('ยังไม่ได้เชื่อมต่อ Google Calendar');
+  const calendar = google.calendar({ version: 'v3', auth });
+  try {
+    await calendar.events.delete({ calendarId: 'primary', eventId, sendUpdates: 'all' });
+  } catch (e) {
+    const code = e.code || (e.response && e.response.status);
+    if (code === 410 || code === 404) return; // event หายไปแล้วจาก Google ฝั่งเดียว ถือว่าสำเร็จ
+    throw e;
+  }
+}
+
+module.exports = {
+  getAuthUrl,
+  handleCallback,
+  isConnected,
+  disconnect,
+  createLeaveEvent,
+  updateLeaveEvent,
+  deleteLeaveEvent,
+};
